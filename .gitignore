@@ -29,3 +29,5 @@ release/
 
 # IDE configs
 .vscode
+.kiro
+.idea
