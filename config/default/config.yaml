@@ -2,7 +2,7 @@
 # This includes the storage backend mode, overrides for specific configurations,
 # and errors to inject into driver calls.
 
-mode: "s3:fake"     # Mode of operation for the driver. Options:
+mode: "s3"     # Mode of operation for the driver. Options:
                     # - "azure:fake" : Fake Azure Blob storage mode.
                     # - "s3:impl"    : Real Amazon S3 storage mode, requires.
                     # - "s3:fake"    : Fake Amazon S3 storage mode.

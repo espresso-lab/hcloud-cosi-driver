@@ -10,8 +10,8 @@ echo "PLATFORM: ${PLATFORM}"
 # debug the rest of the script in case of image/CI build issues
 set -o xtrace
 
-REPO="gcr.io/k8s-staging-sig-storage"
-SAMPLE_DRIVER_IMAGE="${REPO}/cosi-driver-sample"
+REPO="gcr.io/espresso-lab"
+SAMPLE_DRIVER_IMAGE="${REPO}/cosi-driver"
 
 # args to 'make build'
 export DOCKER="/buildx-entrypoint" # available in gcr.io/k8s-testimages/gcb-docker-gcloud image

@@ -43,10 +43,7 @@ type Config struct {
 type Mode string
 
 const (
-	ModeAzure     = Mode("azure:impl") // ModeAzure represents the Azure Blob storage mode.
-	ModeAzureFake = Mode("azure:fake") // ModeAzure represents the Azure Blob storage mode.
-	ModeS3        = Mode("s3:impl")    // ModeS3 represents the Amazon S3 storage mode.
-	ModeS3Fake    = Mode("s3:fake")    // ModeFake represents a fake storage mode.
+	ModeS3 = Mode("s3") // ModeS3 represents the Amazon S3 storage mode.
 )
 
 // UnmarshalYAML custom unmarshaller for Mode.
