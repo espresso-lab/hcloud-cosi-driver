@@ -21,11 +21,16 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: HCLOUD_TOKEN
+            - name: ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: hcloud
-                  key: token
+                  name: hcloud-cosi-driver-credentials
+                  key: accessKey
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hcloud-cosi-driver-credentials
+                  key: secretKey
           volumeMounts:
             - name: socket
               mountPath: /var/lib/cosi

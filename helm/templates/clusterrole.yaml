@@ -20,16 +20,3 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
-  # hcloud Secret (read API token)
-  - apiGroups: [""]
-    resources: ["secrets"]
-    resourceNames: ["hcloud"]
-    verbs: ["get"]
-  # hcloud-cosi-driver-credentials Secret (bootstrap shared S3 credentials)
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["create"]
-  - apiGroups: [""]
-    resources: ["secrets"]
-    resourceNames: ["hcloud-cosi-driver-credentials"]
-    verbs: ["get", "update"]

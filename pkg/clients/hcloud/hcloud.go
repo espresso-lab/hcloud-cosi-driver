@@ -23,32 +23,6 @@ func New(token string) *Client {
 	return &Client{token: token, httpClient: &http.Client{}}
 }
 
-// CreateBucket creates an object storage bucket and returns its numeric ID and name.
-func (c *Client) CreateBucket(ctx context.Context, name string, locationID int) (int, string, error) {
-	body, _ := json.Marshal(map[string]any{
-		"name":                name,
-		"public":              false,
-		"location":            locationID,
-		"object_lock_enabled": false,
-	})
-
-	var resp struct {
-		Bucket struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-		} `json:"bucket"`
-	}
-	if err := c.do(ctx, http.MethodPost, "/v1/_buckets", body, &resp); err != nil {
-		return 0, "", err
-	}
-	return resp.Bucket.ID, resp.Bucket.Name, nil
-}
-
-// DeleteBucket deletes a bucket by its numeric ID. A 404 is treated as success.
-func (c *Client) DeleteBucket(ctx context.Context, bucketID int) error {
-	return c.do(ctx, http.MethodDelete, fmt.Sprintf("/v1/_buckets/%d", bucketID), nil, nil)
-}
-
 // CreateObjectStorageCredentials creates a new credential pair and returns id, accessKey, secretKey.
 func (c *Client) CreateObjectStorageCredentials(ctx context.Context, description string) (int, string, string, error) {
 	body, _ := json.Marshal(map[string]string{"description": description})

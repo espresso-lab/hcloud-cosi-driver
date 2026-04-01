@@ -13,25 +13,15 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
 	cosi "sigs.k8s.io/container-object-storage-interface/proto"
 
-	"github.com/espresso-lab/hcloud-cosi-driver/pkg/clients/hcloud"
 	"github.com/espresso-lab/hcloud-cosi-driver/pkg/config"
 	"github.com/espresso-lab/hcloud-cosi-driver/pkg/driver"
 )
 
-const (
-	credentialsSecret = "hcloud-cosi-driver-credentials"
-	namespace         = "kube-system"
-	gracePeriod       = 5 * time.Second
-)
+const gracePeriod = 5 * time.Second
 
 func main() {
 	cfg, err := config.Load()
@@ -54,22 +44,10 @@ func main() {
 }
 
 func run(ctx context.Context, cfg config.Config) error {
-	k8s, err := kubeClient()
-	if err != nil {
-		return fmt.Errorf("kubernetes client: %w", err)
-	}
-
-	hc := hcloud.New(cfg.HCloudToken)
-	accessKey, secretKey, err := ensureCredentials(ctx, k8s, hc)
-	if err != nil {
-		return fmt.Errorf("credentials bootstrap: %w", err)
-	}
-
 	identity := &driver.IdentityServer{Name: cfg.DriverName}
 	provisioner := &driver.ProvisionerServer{
-		HCloud:    hc,
-		AccessKey: accessKey,
-		SecretKey: secretKey,
+		AccessKey: cfg.AccessKey,
+		SecretKey: cfg.SecretKey,
 	}
 
 	srv := grpc.NewServer()
@@ -92,48 +70,6 @@ func run(ctx context.Context, cfg config.Config) error {
 	}
 	wg.Wait()
 	return nil
-}
-
-// ensureCredentials returns stored S3 credentials or creates them via the Hetzner API.
-func ensureCredentials(ctx context.Context, k8s kubernetes.Interface, hc *hcloud.Client) (accessKey, secretKey string, err error) {
-	sec, err := k8s.CoreV1().Secrets(namespace).Get(ctx, credentialsSecret, metav1.GetOptions{})
-	if err == nil {
-		return string(sec.Data["accessKey"]), string(sec.Data["secretKey"]), nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return "", "", fmt.Errorf("get secret: %w", err)
-	}
-
-	// Secret doesn't exist — create credentials via Hetzner API.
-	_, accessKey, secretKey, err = hc.CreateObjectStorageCredentials(ctx, "hcloud-cosi-driver")
-	if err != nil {
-		return "", "", fmt.Errorf("create credentials: %w", err)
-	}
-
-	_, err = k8s.CoreV1().Secrets(namespace).Create(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      credentialsSecret,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			"accessKey": []byte(accessKey),
-			"secretKey": []byte(secretKey),
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		return "", "", fmt.Errorf("store credentials secret: %w", err)
-	}
-
-	klog.InfoS("Created and stored S3 credentials", "secret", credentialsSecret)
-	return accessKey, secretKey, nil
-}
-
-func kubeClient() (kubernetes.Interface, error) {
-	rc, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-	return kubernetes.NewForConfig(rc)
 }
 
 func listen(ctx context.Context, endpoint string) (net.Listener, func(), error) {

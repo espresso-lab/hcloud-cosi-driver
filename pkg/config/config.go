@@ -15,7 +15,8 @@ const (
 type Config struct {
 	DriverName   string // X_COSI_DRIVER_NAME
 	COSIEndpoint string // COSI_ENDPOINT
-	HCloudToken  string // HCLOUD_TOKEN (required)
+	AccessKey    string // ACCESS_KEY (required)
+	SecretKey    string // SECRET_KEY (required)
 }
 
 // Load reads configuration from environment variables.
@@ -24,11 +25,15 @@ func Load() (Config, error) {
 	cfg := Config{
 		DriverName:   env("X_COSI_DRIVER_NAME", defaultDriverName),
 		COSIEndpoint: env("COSI_ENDPOINT", defaultCOSIEndpoint),
-		HCloudToken:  strings.TrimSpace(os.Getenv("HCLOUD_TOKEN")),
+		AccessKey:    strings.TrimSpace(os.Getenv("ACCESS_KEY")),
+		SecretKey:    strings.TrimSpace(os.Getenv("SECRET_KEY")),
 	}
 
-	if cfg.HCloudToken == "" {
-		return cfg, errors.New("HCLOUD_TOKEN is required")
+	if cfg.AccessKey == "" {
+		return cfg, errors.New("ACCESS_KEY is required")
+	}
+	if cfg.SecretKey == "" {
+		return cfg, errors.New("SECRET_KEY is required")
 	}
 
 	return cfg, nil

@@ -5,7 +5,7 @@
 
 A Kubernetes [COSI](https://github.com/kubernetes-sigs/container-object-storage-interface) driver for [Hetzner Object Storage](https://www.hetzner.com/storage/object-storage).
 
-Buckets are provisioned via the Hetzner Cloud API. S3 credentials are bootstrapped once on startup and shared across all bucket access grants.
+Buckets are provisioned via the S3-compatible API using IAM credentials. S3 credentials are shared across all bucket access grants.
 
 ## Prerequisites
 
@@ -15,12 +15,20 @@ Buckets are provisioned via the Hetzner Cloud API. S3 credentials are bootstrapp
 kubectl create -k 'github.com/kubernetes-sigs/container-object-storage-interface/?ref=v0.2.2'
 ```
 
-- A `hcloud` Secret in `kube-system` with your Hetzner API token (same one used by [hcloud-csi-driver](https://github.com/hetznercloud/csi-driver)):
+- An `hcloud-cosi-driver-credentials` Secret in `kube-system` with your Hetzner Object Storage IAM credentials.
 
-```bash
-kubectl create secret generic hcloud \
-  --namespace kube-system \
-  --from-literal=token=<your-hcloud-api-token>
+  You can create IAM credentials in the [Hetzner Cloud Console](https://console.hetzner.cloud) under **Object Storage → S3 credentials**.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hcloud-cosi-driver-credentials
+  namespace: kube-system
+type: Opaque
+stringData:
+  accessKey: "<your-access-key>"
+  secretKey: "<your-secret-key>"
 ```
 
 ## Install
@@ -83,4 +91,3 @@ spec:
 ```
 
 Once reconciled, `my-bucket-credentials` will contain the S3 `accessKeyID`, `accessSecretKey`, `endpoint`, and `bucketName` for `https://fsn1.your-objectstorage.com`.
-
