@@ -22,6 +22,8 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
             readOnlyRootFilesystem: true
           env:
             - name: HCLOUD_TOKEN
@@ -36,7 +38,6 @@ spec:
           image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
           imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
           securityContext:
-            runAsNonRoot: true
             readOnlyRootFilesystem: true
           volumeMounts:
             - name: socket
