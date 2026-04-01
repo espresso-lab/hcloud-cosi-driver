@@ -1,3 +1,6 @@
+![hcloud-cosi-driver](docs/picture.png)
+
+
 # hcloud-cosi-driver
 
 A Kubernetes [COSI](https://github.com/kubernetes-sigs/container-object-storage-interface) driver for [Hetzner Object Storage](https://www.hetzner.com/storage/object-storage).
