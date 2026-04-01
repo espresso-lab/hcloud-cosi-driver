@@ -1,0 +1,10 @@
+image:
+  repository: ghcr.io/espresso-lab/hcloud-cosi-driver
+  tag: main
+  pullPolicy: IfNotPresent
+
+sidecar:
+  image:
+    repository: gcr.io/k8s-staging-sig-storage/objectstorage-sidecar/objectstorage-sidecar
+    tag: v20221117-v0.1.0-22-g0e67387
+    pullPolicy: IfNotPresent

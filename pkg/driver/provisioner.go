@@ -1,208 +1,138 @@
-// Copyright 2021-2024 The Kubernetes Authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package driver
 
 import (
 	"context"
-	"errors"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
 	"k8s.io/klog/v2"
+
 	cosi "sigs.k8s.io/container-object-storage-interface/proto"
-	"sigs.k8s.io/cosi-driver-sample/pkg/clients"
-	"sigs.k8s.io/cosi-driver-sample/pkg/config"
+
+	"github.com/espresso-lab/hcloud-cosi-driver/pkg/clients/hcloud"
 )
 
-var ErrBucketNotFound = errors.New("bucket not found")
+// locationIDs maps Hetzner location names to their numeric API IDs.
+var locationIDs = map[string]int{
+	"fsn1": 1,
+	"nbg1": 2,
+	"hel1": 3,
+}
 
-// ProvisionerServer implements the COSI driver server interface.
+// endpointForLocation constructs the Hetzner Object Storage S3 endpoint for a given location name.
+func endpointForLocation(location string) string {
+	return "https://" + location + ".your-objectstorage.com"
+}
+
+// parseBucketID splits a "<location>:<numeric-id>:<bucket-name>" bucket ID into its parts.
+func parseBucketID(bucketID string) (location string, id int, name string, err error) {
+	parts := strings.SplitN(bucketID, ":", 3)
+	if len(parts) != 3 {
+		return "", 0, "", fmt.Errorf("expected <location>:<id>:<name>, got %q", bucketID)
+	}
+	id, err = strconv.Atoi(parts[1])
+	if err != nil {
+		return "", 0, "", fmt.Errorf("invalid numeric id in %q: %w", bucketID, err)
+	}
+	return parts[0], id, parts[2], nil
+}
+
+// ProvisionerServer implements the COSI ProvisionerServer interface.
 type ProvisionerServer struct {
 	cosi.UnimplementedProvisionerServer
 
-	Client clients.Client
-	Config config.Config
+	HCloud    *hcloud.Client
+	AccessKey string
+	SecretKey string
 }
 
-// DriverCreateBucket creates a bucket if it does not already exist.
-// If the bucket exists and the parameters match, it returns success without error.
-// If the bucket exists but the parameters differ, it returns a conflict error.
-//
-// Return values:
-//   - nil: The bucket was successfully created or already exists with matching parameters.
-//   - codes.AlreadyExists: The bucket already exists but with different parameters.
-//   - error: Internal error requiring retries.
 func (s *ProvisionerServer) DriverCreateBucket(
 	ctx context.Context,
 	req *cosi.DriverCreateBucketRequest,
 ) (*cosi.DriverCreateBucketResponse, error) {
-	bucketName, overridden := s.getName(req)
-	parameters := req.GetParameters()
-
-	if err := s.Config.Errors.CreateBucket; err != nil {
-		klog.ErrorS(err, "Purposefully failing DriverCreateBucket call", "bucket", bucketName, "parameters", parameters)
-		return nil, status.Error(err.Code, err.Message)
-	}
-
-	exists, err := s.Client.BucketExists(ctx, bucketName)
+	name, err := bucketName(req.GetName())
 	if err != nil {
-		klog.ErrorS(err, "Failed to check bucket existence", "bucket", bucketName, "parameters", parameters)
-		return nil, status.Errorf(codes.Internal, "%s", err)
-	}
-	if exists {
-		if overridden {
-			klog.InfoS("Overridden bucket exists, skipping validation", "bucket", bucketName, "parameters", parameters)
-			return &cosi.DriverCreateBucketResponse{BucketId: bucketName}, nil
-		}
-
-		equal, err := s.Client.IsBucketEqual(ctx, bucketName, parameters)
-		if err != nil {
-			klog.ErrorS(err, "Failed to compare bucket with expected parameters", "bucket", bucketName, "parameters", parameters)
-			return nil, status.Errorf(codes.Internal, "%s", err)
-		}
-		if equal {
-			klog.InfoS("Bucket already exists with matching parameters", "bucket", bucketName)
-			return &cosi.DriverCreateBucketResponse{BucketId: bucketName}, nil
-		}
-
-		klog.InfoS("Bucket already exists with differing parameters", "bucket", bucketName)
-		return nil, status.Errorf(codes.AlreadyExists, "bucket already exists: %s", bucketName)
+		return nil, status.Errorf(codes.Internal, "generate bucket name: %v", err)
 	}
 
-	if err := s.Client.CreateBucket(ctx, bucketName, parameters); err != nil {
-		klog.ErrorS(err, "Failed to create bucket", "bucket", bucketName)
-		return nil, err
+	location := "fsn1"
+	if loc := strings.ToLower(req.GetParameters()["location"]); loc != "" {
+		if _, ok := locationIDs[loc]; ok {
+			location = loc
+		}
 	}
 
-	klog.InfoS("Bucket successfully created", "bucket", bucketName)
+	id, bucketName, err := s.HCloud.CreateBucket(ctx, name, locationIDs[location])
+	if err != nil {
+		klog.ErrorS(err, "Failed to create bucket", "bucket", name)
+		return nil, status.Errorf(codes.Internal, "create bucket: %v", err)
+	}
+
+	klog.InfoS("Bucket created", "bucket", bucketName, "id", id, "location", location)
 	return &cosi.DriverCreateBucketResponse{
-		BucketId:   bucketName,
-		BucketInfo: s.Client.ProtocolInfo(),
+		BucketId: location + ":" + strconv.Itoa(id) + ":" + bucketName,
 	}, nil
 }
 
-// DriverDeleteBucket deletes a bucket if it exists. If the bucket does not exist, it returns success.
-//
-// Return values:
-//   - nil: The bucket was successfully deleted or does not exist.
-//   - error: Internal error requiring retries.
 func (s *ProvisionerServer) DriverDeleteBucket(
 	ctx context.Context,
 	req *cosi.DriverDeleteBucketRequest,
 ) (*cosi.DriverDeleteBucketResponse, error) {
-	bucketId := s.getBucketID(req)
-
-	if err := s.Config.Errors.DeleteBucket; err != nil {
-		klog.ErrorS(err, "Purposefully failing DriverDeleteBucket call", "bucket", bucketId)
-		return nil, status.Error(err.Code, err.Message)
+	_, id, _, err := parseBucketID(req.GetBucketId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid bucket id: %v", err)
 	}
 
-	if err := s.Client.DeleteBucket(ctx, bucketId); err != nil {
-		klog.ErrorS(err, "Failed to delete bucket", "bucket", bucketId)
-		return nil, status.Errorf(codes.Internal, "%s", err)
+	if err := s.HCloud.DeleteBucket(ctx, id); err != nil {
+		klog.ErrorS(err, "Failed to delete bucket", "id", id)
+		return nil, status.Errorf(codes.Internal, "delete bucket: %v", err)
 	}
 
-	klog.InfoS("Bucket successfully deleted", "bucket", bucketId)
+	klog.InfoS("Bucket deleted", "id", id)
 	return &cosi.DriverDeleteBucketResponse{}, nil
 }
 
-// DriverGrantBucketAccess grants access to a bucket. It creates an access account for the given bucket and user.
-//
-// Return values:
-//   - nil: Access successfully granted.
-//   - error: Internal error requiring retries.
 func (s *ProvisionerServer) DriverGrantBucketAccess(
-	ctx context.Context,
+	_ context.Context,
 	req *cosi.DriverGrantBucketAccessRequest,
 ) (*cosi.DriverGrantBucketAccessResponse, error) {
-	bucketId := s.getBucketID(req)
-	name, _ := s.getName(req)
-
-	if err := s.Config.Errors.GrantBucketAccess; err != nil {
-		klog.ErrorS(err, "Purposefully failing DriverGrantBucketAccess call", "bucket", bucketId, "account", name)
-		return nil, status.Error(err.Code, err.Message)
-	}
-
-	exists, err := s.Client.BucketExists(ctx, bucketId)
+	location, _, bucketName, err := parseBucketID(req.GetBucketId())
 	if err != nil {
-		klog.ErrorS(err, "Failed to check bucket existence", "bucket", bucketId, "account", name)
-		return nil, status.Errorf(codes.Internal, "%s", err)
+		return nil, status.Errorf(codes.InvalidArgument, "invalid bucket id: %v", err)
 	}
-	if !exists {
-		klog.ErrorS(ErrBucketNotFound, "Cannot grant access to nonexistent bucket", "bucket", bucketId, "account", name)
-		return nil, status.Errorf(codes.NotFound, "%s", ErrBucketNotFound)
-	}
-
-	access, err := s.Client.CreateBucketAccess(ctx, bucketId, name)
-	if err != nil {
-		klog.ErrorS(err, "Failed to create bucket access", "bucket", bucketId, "account", name)
-		return nil, status.Errorf(codes.Internal, "%s", err)
-	}
-
-	klog.InfoS("Bucket access successfully granted", "name", access.Name())
 
 	return &cosi.DriverGrantBucketAccessResponse{
-		AccountId: access.Name(),
+		AccountId: req.GetName(),
 		Credentials: map[string]*cosi.CredentialDetails{
-			access.Platform(): {
-				Secrets: access.Credentials(),
+			"s3": {
+				Secrets: map[string]string{
+					"accessKeyID":     s.AccessKey,
+					"accessSecretKey": s.SecretKey,
+					"endpoint":        endpointForLocation(location),
+					"bucketName":      bucketName,
+				},
 			},
 		},
 	}, nil
 }
 
-// DriverRevokeBucketAccess revokes access to a bucket for a specific account.
-// If the access does not exist, it returns success.
-//
-// Return values:
-//   - nil: Access successfully revoked or does not exist.
-//   - error: Internal error requiring retries.
 func (s *ProvisionerServer) DriverRevokeBucketAccess(
-	ctx context.Context,
-	req *cosi.DriverRevokeBucketAccessRequest,
+	_ context.Context,
+	_ *cosi.DriverRevokeBucketAccessRequest,
 ) (*cosi.DriverRevokeBucketAccessResponse, error) {
-	bucketId := s.getBucketID(req)
-	accountId := req.GetAccountId()
-
-	if err := s.Config.Errors.RevokeBucketAccess; err != nil {
-		klog.ErrorS(err, "Purposefully failing DriverRevokeBucketAccess call", "bucket", bucketId, "account", accountId)
-		return nil, status.Error(err.Code, err.Message)
-	}
-
-	if err := s.Client.DeleteBucketAccess(ctx, bucketId, accountId); err != nil {
-		klog.ErrorS(err, "Failed to revoke bucket access", "bucket", bucketId, "account", accountId)
-		return nil, status.Errorf(codes.Internal, "%s", err)
-	}
-
-	klog.InfoS("Bucket access successfully revoked", "bucket", bucketId, "account", accountId)
 	return &cosi.DriverRevokeBucketAccessResponse{}, nil
 }
 
-func (s *ProvisionerServer) getName(req interface{ GetName() string }) (string, bool) {
-	if id := s.Config.Overrides.BucketID; id != "" {
-		return id, false
+// bucketName generates "<requested>-<8 uppercase hex chars>".
+func bucketName(requested string) (string, error) {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("rand: %w", err)
 	}
-
-	return req.GetName(), true
-}
-
-func (s *ProvisionerServer) getBucketID(req interface{ GetBucketId() string }) string {
-	if id := s.Config.Overrides.BucketID; id != "" {
-		return id
-	}
-
-	return req.GetBucketId()
+	return requested + "-" + strings.ToUpper(hex.EncodeToString(b)), nil
 }

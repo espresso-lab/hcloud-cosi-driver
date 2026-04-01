@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hcloud-cosi-driver.fullname" . }}
+  namespace: kube-system
+  labels:
+    {{- include "hcloud-cosi-driver.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "hcloud-cosi-driver.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hcloud-cosi-driver.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "hcloud-cosi-driver.fullname" . }}
+      containers:
+        - name: driver
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+          env:
+            - name: HCLOUD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hcloud
+                  key: token
+          volumeMounts:
+            - name: socket
+              mountPath: /var/lib/cosi
+        - name: sidecar
+          image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
+          imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: socket
+              mountPath: /var/lib/cosi
+      volumes:
+        - name: socket
+          emptyDir: {}

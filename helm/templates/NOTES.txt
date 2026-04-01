@@ -1,0 +1,7 @@
+hcloud-cosi-driver has been deployed to kube-system.
+
+The driver requires the following pre-existing Secret in kube-system:
+  - hcloud (key: token) — your Hetzner Cloud API token
+
+On first startup the driver will automatically create the
+hcloud-cosi-driver-credentials Secret with shared S3 credentials.

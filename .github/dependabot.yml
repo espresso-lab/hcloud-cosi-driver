@@ -3,7 +3,6 @@ updates:
   - package-ecosystem: "gomod"
     directories:
       - "/"
-      - "/hack/tools"
     schedule:
       interval: "weekly"
     commit-message:

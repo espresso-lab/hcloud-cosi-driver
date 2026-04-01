@@ -76,11 +76,6 @@ lint-fix: ## Run golangci-lint linter and perform fixes.
 lint-logging: ## Run logcheck linter to verify the logging practices.
 	$(LOGCHECK) ./... || (echo 'Fix structured logging' && exit 1)
 
-.PHONY: lint-manifests
-lint-manifests: ## Run kube-linter on Kubernetes manifests.
-	$(KUSTOMIZE) build config/default |\
-		$(KUBE_LINTER) lint --config=./config/.kube-linter.yaml -
-
 .PHONY: verify-licenses
 verify-licenses: ## Run addlicense to verify if files have license headers.
 	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(ADDLICENSE) -check || (echo 'Run "make update"' && exit 1)
@@ -92,9 +87,7 @@ add-licenses: ## Run addlicense to append license headers to files missing one.
 ##@ Dependencies
 
 ## Tool Binaries
-GOTOOLCMD     := go tool -modfile=hack/tools/go.mod
+GOTOOLCMD     := go tool
 ADDLICENSE    ?= $(GOTOOLCMD) github.com/google/addlicense
 GOLANGCI_LINT ?= $(GOTOOLCMD) github.com/golangci/golangci-lint/v2/cmd/golangci-lint
-KUBE_LINTER   ?= $(GOTOOLCMD) golang.stackrox.io/kube-linter/cmd/kube-linter
-KUSTOMIZE     ?= $(GOTOOLCMD) sigs.k8s.io/kustomize/kustomize/v5
 LOGCHECK      ?= $(GOTOOLCMD) sigs.k8s.io/logtools/logcheck

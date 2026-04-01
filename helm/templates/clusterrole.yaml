@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "hcloud-cosi-driver.fullname" . }}
+  labels:
+    {{- include "hcloud-cosi-driver.labels" . | nindent 4 }}
+rules:
+  # COSI resources
+  - apiGroups: ["objectstorage.k8s.io"]
+    resources: ["buckets", "bucketaccesses", "bucketclaims", "bucketaccessclasses", "bucketclasses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["objectstorage.k8s.io"]
+    resources: ["buckets/status", "bucketaccesses/status", "bucketclaims/status"]
+    verbs: ["get", "update", "patch"]
+  # Leases for leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  # hcloud Secret (read API token)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["hcloud"]
+    verbs: ["get"]
+  # hcloud-cosi-driver-credentials Secret (bootstrap shared S3 credentials)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["hcloud-cosi-driver-credentials"]
+    verbs: ["get", "create", "update"]
