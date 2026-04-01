@@ -14,6 +14,7 @@ COPY cmd/ cmd/
 
 RUN CGO_ENABLED=0 go build -trimpath -o build/hcloud-cosi-driver cmd/cosi-driver/main.go
 
+
 #
 # FINAL IMAGE
 #
