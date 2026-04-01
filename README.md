@@ -10,6 +10,11 @@ Buckets are provisioned via the Hetzner Cloud API. S3 credentials are bootstrapp
 ## Prerequisites
 
 - Kubernetes cluster with the [COSI controller](https://github.com/kubernetes-sigs/container-object-storage-interface) installed
+
+```bash
+kubectl create -k 'github.com/kubernetes-sigs/container-object-storage-interface/?ref=v0.2.2'
+```
+
 - A `hcloud` Secret in `kube-system` with your Hetzner API token (same one used by [hcloud-csi-driver](https://github.com/hetznercloud/csi-driver)):
 
 ```bash
@@ -21,7 +26,7 @@ kubectl create secret generic hcloud \
 ## Install
 
 ```bash
-helm install hcloud-cosi-driver oci://ghcr.io/espresso-lab/helm-charts/hcloud-cosi-driver \
+helm install hcloud-cosi-driver oci://ghcr.io/espresso-lab/hcloud-cosi-driver/hcloud-cosi-driver \
   --namespace kube-system \
   --version <version>
 ```
