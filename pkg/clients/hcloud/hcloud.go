@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"k8s.io/klog/v2"
 )
 
-const apiBase = "https://api.hetzner.cloud/v1"
+const apiBase = "https://api.hetzner.cloud"
 
 // Client calls the Hetzner Cloud API using a bearer token.
 type Client struct {
@@ -61,12 +63,24 @@ func (c *Client) CreateObjectStorageCredentials(ctx context.Context, description
 	if err := c.do(ctx, http.MethodPost, "/v1/_object_storage_credentials", body, &resp); err != nil {
 		return 0, "", "", err
 	}
+	if resp.Credential.AccessKey == "" || resp.SecretKey == "" {
+		err := fmt.Errorf("hcloud API returned empty credentials")
+		klog.ErrorS(err, "CreateObjectStorageCredentials returned empty access key or secret key")
+		return 0, "", "", err
+	}
 	return resp.Credential.ID, resp.Credential.AccessKey, resp.SecretKey, nil
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body []byte, out any) error {
-	req, err := http.NewRequestWithContext(ctx, method, apiBase+path, bytes.NewReader(body))
+	var bodyReader *bytes.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	} else {
+		bodyReader = bytes.NewReader(nil)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, apiBase+path, bodyReader)
 	if err != nil {
+		klog.ErrorS(err, "Failed to build HCloud API request", "method", method, "path", path)
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -76,6 +90,7 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte, out a
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
+		klog.ErrorS(err, "HCloud API request error", "method", method, "path", path)
 		return err
 	}
 	defer res.Body.Close() //nolint:errcheck
@@ -84,7 +99,9 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte, out a
 		return nil // treat 404 as success (idempotent deletes)
 	}
 	if res.StatusCode >= 300 {
-		return fmt.Errorf("hcloud API %s %s: status %d", method, path, res.StatusCode)
+		err := fmt.Errorf("hcloud API %s %s: status %d", method, path, res.StatusCode)
+		klog.ErrorS(err, "HCloud API request failed", "method", method, "path", path, "status", res.StatusCode)
+		return err
 	}
 	if out != nil {
 		return json.NewDecoder(res.Body).Decode(out)
