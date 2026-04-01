@@ -17,10 +17,8 @@ RUN CGO_ENABLED=0 go build -trimpath -o build/hcloud-cosi-driver cmd/cosi-driver
 #
 # FINAL IMAGE
 #
-FROM gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=builder /buildroot/build/hcloud-cosi-driver /hcloud-cosi-driver
-
-USER nonroot:nonroot
 
 ENTRYPOINT [ "/hcloud-cosi-driver" ]
