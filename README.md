@@ -14,23 +14,18 @@ Buckets are provisioned via the S3-compatible API using IAM credentials. S3 cred
 kubectl create -k 'github.com/kubernetes-sigs/container-object-storage-interface/?ref=v0.2.2'
 ```
 
-- An `hcloud-cosi-driver-credentials` Secret in `kube-system` with your Hetzner Object Storage IAM credentials.
+- An `hcloud-cosi-driver-credentials` Secret in `kube-system` with your Hetzner Object Storage S3 credentials.
 
-  You can create IAM credentials in the [Hetzner Cloud Console](https://console.hetzner.cloud) under **Object Storage → S3 credentials**.
+  You can create S3 credentials in the [Hetzner Cloud Console](https://console.hetzner.cloud) under **Object Storage → S3 credentials**.
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: hcloud-cosi-driver-credentials
-  namespace: kube-system
-type: Opaque
-stringData:
-  accessKey: "<your-access-key>"
-  secretKey: "<your-secret-key>"
+```bash
+kubectl create secret generic hcloud-cosi-driver-credentials \
+  -n kube-system \
+  --from-literal=accessKey="<your-access-key>" \
+  --from-literal=secretKey="<your-secret-key>"
 ```
 
-## Install
+## Install the driver
 
 ```bash
 helm install hcloud-cosi-driver oci://ghcr.io/espresso-lab/hcloud-cosi-driver/hcloud-cosi-driver \

@@ -131,11 +131,11 @@ func (s *ProvisionerServer) DriverRevokeBucketAccess(
 	return &cosi.DriverRevokeBucketAccessResponse{}, nil
 }
 
-// bucketName generates "<requested>-<8 uppercase hex chars>".
+// bucketName generates "<requested>-<8 lowercase hex chars>".
 func bucketName(requested string) (string, error) {
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("rand: %w", err)
 	}
-	return requested + "-" + strings.ToUpper(hex.EncodeToString(b)), nil
+	return requested + "-" + hex.EncodeToString(b), nil
 }
