@@ -28,5 +28,8 @@ rules:
   # hcloud-cosi-driver-credentials Secret (bootstrap shared S3 credentials)
   - apiGroups: [""]
     resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
     resourceNames: ["hcloud-cosi-driver-credentials"]
-    verbs: ["get", "create", "update"]
+    verbs: ["get", "update"]
