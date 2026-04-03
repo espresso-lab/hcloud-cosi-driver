@@ -5,6 +5,6 @@ image:
 
 sidecar:
   image:
-    repository: gcr.io/k8s-staging-sig-storage/objectstorage-sidecar/objectstorage-sidecar
-    tag: v20221117-v0.1.0-22-g0e67387
+    repository: registry.k8s.io/sig-storage/objectstorage-sidecar
+    tag: v0.2.2
     pullPolicy: IfNotPresent
