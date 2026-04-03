@@ -131,15 +131,15 @@ func (s *ProvisionerServer) DriverRevokeBucketAccess(
 	return &cosi.DriverRevokeBucketAccessResponse{}, nil
 }
 
-// bucketName generates "cosi-<requested>-<8 lowercase hex chars>", truncated to 63 chars.
+// bucketName generates "cosi-<requested>-<4 lowercase hex chars>", max 40 chars total.
 func bucketName(requested string) (string, error) {
-	b := make([]byte, 4)
+	b := make([]byte, 2)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("rand: %w", err)
 	}
-	suffix := hex.EncodeToString(b) // 8 chars
-	// S3 limit: 63 chars. "cosi-" (5) + "-" (1) + suffix (8) = 14 reserved.
-	const maxBase = 63 - 14
+	suffix := hex.EncodeToString(b) // 4 chars
+	// Max 40 chars. "cosi-" (5) + "-" (1) + suffix (4) = 10 reserved.
+	const maxBase = 40 - 10
 	base := requested
 	if len(base) > maxBase {
 		base = base[:maxBase]
