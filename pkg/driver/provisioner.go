@@ -2,8 +2,6 @@ package driver
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -51,10 +49,7 @@ func (s *ProvisionerServer) DriverCreateBucket(
 	ctx context.Context,
 	req *cosi.DriverCreateBucketRequest,
 ) (*cosi.DriverCreateBucketResponse, error) {
-	name, err := bucketName(req.GetName())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "generate bucket name: %v", err)
-	}
+	name := bucketName(req.GetName())
 
 	location := "fsn1"
 	if loc := strings.ToLower(req.GetParameters()["location"]); loc != "" {
@@ -131,18 +126,12 @@ func (s *ProvisionerServer) DriverRevokeBucketAccess(
 	return &cosi.DriverRevokeBucketAccessResponse{}, nil
 }
 
-// bucketName generates "cosi-<requested>-<4 lowercase hex chars>", max 40 chars total.
-func bucketName(requested string) (string, error) {
-	b := make([]byte, 2)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("rand: %w", err)
+// bucketName generates "cosi-<requested>", truncated to 63 chars (S3 limit).
+func bucketName(requested string) string {
+	const maxLen = 63
+	name := "cosi-" + requested
+	if len(name) > maxLen {
+		name = name[:maxLen]
 	}
-	suffix := hex.EncodeToString(b) // 4 chars
-	// Max 40 chars. "cosi-" (5) + "-" (1) + suffix (4) = 10 reserved.
-	const maxBase = 40 - 10
-	base := requested
-	if len(base) > maxBase {
-		base = base[:maxBase]
-	}
-	return "cosi-" + base + "-" + suffix, nil
+	return name
 }
